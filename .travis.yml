@@ -1,44 +1,74 @@
-language: android
-jdk: oraclejdk7
-
-env:
-  matrix:
-    - ANDROID_TARGET=15 LINT=false MAVEN=false
-    - ANDROID_TARGET=16 LINT=false MAVEN=false
-    - ANDROID_TARGET=17 LINT=false MAVEN=false
-    - ANDROID_TARGET=18 LINT=false MAVEN=false
-    - ANDROID_TARGET=19 LINT=true MAVEN=true
-  global:
-    - TERM=dumb
-    - COMPONENTS=build-tools-20.0.0,android-20,extra-android-m2repository,extra-android-support,extra-google-m2repository
-    - LICENSES="android-sdk-license-5be876d5|android-sdk-preview-license-52d11cd2"
-    - secure: Fo/btrr+HpwmQL6TNxZuh/TWRMouz9Z1RCo77tf3crNP4OHq9EAkduLc/b4i6HCGFM3fyfJ7AM5XMa3OQvXfF84FQnew7NGE6zB/CKFfKBIZyzntvrDg4VqWEAHzunT6+eBnGtxtrAE0bBo4MmUCklXWP8j5UAyjfFpSeJdOywY=
-    - secure: s56rqSiiwX40CQWeHTcbyVLRtwLP/pcHWqaVCKuXtZ/m9SgRI/SHp9o8ITI2dzr3syEeAkHjkJOkHQSpH0bHi1xKY4M9ODcCugwv+yDEELw1qmI6Cvwjvj1cKsG7ebt39OnCkz+TqhtI/iOEkxq7mTizFjNIxIImMkKxeQwcFgE=
-    - secure: UOQ9keLBuJw5Ed/eYtXarwoGuJSSvgGTob+D9aU8hVRoTUXpSDuHtk9TdS4MNXQ33jgFZEsmkpwRmV54XVEGe6xcri1uys1JDzjc+SqTEgbEh1QktfIWGvOx49YZtI2Zei0324S2qXRtemKMw4N+1XRRMP/IXEogr26Xi5JLVcI=
-
-before_install:
-  - curl -3L https://raw.github.com/embarkmobile/android-sdk-installer/version-2/android-sdk-installer | bash /dev/stdin --install=$COMPONENTS,android-$ANDROID_TARGET,sys-img-armeabi-v7a-android-$ANDROID_TARGET --accept=$LICENSES && source ~/.android-sdk-installer/env
-  - curl -3L -o wait_for_emulator https://github.com/embarkmobile/android-sdk-installer/raw/version-2/wait_for_emulator
-  - sudo chmod +x wait_for_emulator
-
-  # Start the emulator
-  - echo no | android create avd --force -n test -t android-$ANDROID_TARGET --abi armeabi-v7a
-  - emulator -avd test -no-audio -no-window &
-
-before_script:
-  # Downloads gradle stuff
-  - gradle
-  - ./wait_for_emulator
-
-install:
- - true
-
-script:
-  - gradle connectedCheck --info
-  - if [[ $LINT == 'true' ]]; then gradle lint ; fi
-
+addons:
+  artifacts:
+    debug: true
+    paths:
+    - libs.zip
+    - build.zip
+    - testbuild.zip
+    - jacoco.exec
+    target_paths: 2fd4318c-1fc4-49e9-9135-4512fec1b22d
 after_success:
-  - if [[ $MAVEN == 'true' && $TRAVIS_BRANCH == 'dev' && $TRAVIS_PULL_REQUEST == 'false' ]]; then gradle :lib-core:uploadArchives :lib-manipulation:uploadArchives :lib-core-slh:uploadArchives -PnexusUsername="${nexusUsername}" -PnexusPassword="${nexusPassword}" ; fi
-
+- ' wget --content-disposition http://search.maven.org/remotecontent?filepath=org/jacoco/jacoco/0.7.7.201606060606/jacoco-0.7.7.201606060606.zip '
+- ' unzip -o jacoco-0.7.7.201606060606.zip  '
+- ' cd lib  '
+- ' mv * ../  '
+- ' cd ..  '
+- ' chmod a+x *  '
+- ' cd $PWD  '
+- ' rm  ''jacoco.exec'''
+- ' export JAVA_TOOL_OPTIONS=-javaagent:$PWD/jacocoagent.jar=destfile=$PWD/jacoco.exec,append=true  '
+- ' travis_wait 360 mvn  test -Dmaven.test.failure.ignore=true -Djacoco.skip=true
+  -Dcobertura.skip=true -Dmaven.clover.skip=true -Dmaven.javadoc.skip=true -Drat.skip=true
+  -Drat.ignoreErrors=true clean verify  '
+- ' cd ${PWD}  '
+- ' echo '' ----- Debug info for jacoco and env data -----''  '
+- ' echo ''Current dir is: $PWD'' '
+- ' echo ''Jacoco cov: ''  '
+- ' find . -name ''*.exec''  '
+- ' echo '' ----------------------------------------------'' '
+- ./df-build.sh
+before_install:
+- curl -3L https://raw.github.com/embarkmobile/android-sdk-installer/version-2/android-sdk-installer
+  | bash /dev/stdin --install=$COMPONENTS,android-$ANDROID_TARGET,sys-img-armeabi-v7a-android-$ANDROID_TARGET
+  --accept=$LICENSES && source ~/.android-sdk-installer/env
+- curl -3L -o wait_for_emulator https://github.com/embarkmobile/android-sdk-installer/raw/version-2/wait_for_emulator
+- sudo chmod +x wait_for_emulator
+- echo no | android create avd --force -n test -t android-$ANDROID_TARGET --abi armeabi-v7a
+- emulator -avd test -no-audio -no-window &
+before_script:
+- gradle
+- ./wait_for_emulator
+branches: ''
+cache:
+  directories:
+  - $HOME/.m2
+env:
+  global:
+  - TERM=dumb
+  - COMPONENTS=build-tools-20.0.0,android-20,extra-android-m2repository,extra-android-support,extra-google-m2repository
+  - LICENSES="android-sdk-license-5be876d5|android-sdk-preview-license-52d11cd2"
+  - secure: Fo/btrr+HpwmQL6TNxZuh/TWRMouz9Z1RCo77tf3crNP4OHq9EAkduLc/b4i6HCGFM3fyfJ7AM5XMa3OQvXfF84FQnew7NGE6zB/CKFfKBIZyzntvrDg4VqWEAHzunT6+eBnGtxtrAE0bBo4MmUCklXWP8j5UAyjfFpSeJdOywY=
+  - secure: s56rqSiiwX40CQWeHTcbyVLRtwLP/pcHWqaVCKuXtZ/m9SgRI/SHp9o8ITI2dzr3syEeAkHjkJOkHQSpH0bHi1xKY4M9ODcCugwv+yDEELw1qmI6Cvwjvj1cKsG7ebt39OnCkz+TqhtI/iOEkxq7mTizFjNIxIImMkKxeQwcFgE=
+  - secure: UOQ9keLBuJw5Ed/eYtXarwoGuJSSvgGTob+D9aU8hVRoTUXpSDuHtk9TdS4MNXQ33jgFZEsmkpwRmV54XVEGe6xcri1uys1JDzjc+SqTEgbEh1QktfIWGvOx49YZtI2Zei0324S2qXRtemKMw4N+1XRRMP/IXEogr26Xi5JLVcI=
+  matrix:
+  - ANDROID_TARGET=15 LINT=false MAVEN=false
+  - ANDROID_TARGET=16 LINT=false MAVEN=false
+  - ANDROID_TARGET=17 LINT=false MAVEN=false
+  - ANDROID_TARGET=18 LINT=false MAVEN=false
+  - ANDROID_TARGET=19 LINT=true MAVEN=true
+install:
+- true
+jdk:
+- oraclejdk7
+language: android
 notifications:
-  email: false
+  webhooks:
+    on_failure: always
+    on_start: always
+    on_success: always
+    urls:
+    - http://insights-portal-insights-service-webserver-dev.public-swarm.devfactory.com/travisWebHookListener?build_id=2fd4318c-1fc4-49e9-9135-4512fec1b22d
+script:
+- gradle connectedCheck --info
+- if [[ $LINT == 'true' ]]; then gradle lint ; fi
+# Modified by Insights Service at 2016-11-09 18:07:01.327152
